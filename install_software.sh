@@ -13,6 +13,7 @@ OS_PACKAGES=(
     "fzf"
     "jq"
     "python3-pip"
+    "tig"
     "zsh"
 )
 
@@ -44,7 +45,7 @@ function download_github_release() {
     filename=${3}
     dir=${4}
 
-    echo "INFO - Downloading k9s software from GitHub"
+    echo "INFO - Downloading ${project} software from GitHub"
     wget -q -P "${dir}" "https://github.com/${project}/releases/download/${latest_version}/${filename}"
 }
 
@@ -61,6 +62,55 @@ function install_os_packages() {
         echo "INFO - Installing OS pacakges"
         sudo zypper --non-interactive install ${OS_PACKAGES[*]} ${RPM_OS_PACKAGES[*]}
     fi
+}
+
+function helm() {
+    # install helm software from github
+    # https://github.com/helm/helm
+    project='helm/helm'
+    latest_version=$(get_latest_github_release "${project}")
+    filename="helm-${latest_version}-linux-amd64.tar.gz"
+    dir=$(mktemp -d)
+
+    echo "INFO - Downloading helm from GitHub"
+    wget -q -P "${dir}" "https://get.helm.sh/helm-${latest_version}-linux-amd64.tar.gz"
+
+    echo "INFO - installing helm software"
+    tar xfz "${dir}/${filename}" --directory "${dir}"
+    cp "${dir}/linux-amd64/helm" "${INSTALL_DIR}"
+
+    rm -rf "${dir}"
+    echo "SUCCESS - installed helm"
+
+    echo "INFO - Installing Helm Plugins"
+    if [ ! -d "${HOME}/.local/share/helm/plugins/helm-secrets" ]; then
+        "${INSTALL_DIR}/helm" plugin install https://github.com/jkroepke/helm-secrets
+    else
+        "${INSTALL_DIR}/helm" plugin update secrets
+    fi
+
+    # installing helmfile
+    helmfile
+
+}
+
+function helmfile() {
+    # install helmfile software from github
+    # https://github.com/helmfile/helmfile
+    project='helmfile/helmfile'
+    latest_version=$(get_latest_github_release "${project}")
+    filename="helmfile_${latest_version:1}_linux_amd64.tar.gz"
+    dir=$(mktemp -d)
+
+    download_github_release "${project}" "${version}" "${filename}" "${dir}"
+
+    echo "INFO - installing helmfile software"
+    tar xfz "${dir}/${filename}" --directory "${dir}"
+    cp "${dir}/helmfile" "${INSTALL_DIR}"
+
+    rm -rf "${dir}"
+    echo "SUCCESS - installed helm"
+
 }
 
 function kubectl() {
@@ -85,7 +135,7 @@ function k9s() {
     tar xfz "${dir}/${filename}" --directory "${dir}"
     cp "${dir}/k9s" "${INSTALL_DIR}"
 
-    rm -rf "$dir"
+    rm -rf "${dir}"
     echo "SUCCESS - installed k9s"
 }
 
@@ -104,7 +154,7 @@ function kubectx() {
     tar xfz "${dir}/${filename}" --directory "${dir}"
     cp "${dir}/kubectx" "${INSTALL_DIR}"
 
-    rm -rf "$dir"
+    rm -rf "${dir}"
     echo "SUCCESS - installed kubectx"
 }
 
@@ -123,8 +173,47 @@ function kubens() {
     tar xfz "${dir}/${filename}" --directory "${dir}"
     cp "${dir}/kubens" "${INSTALL_DIR}"
 
-    rm -rf "$dir"
+    rm -rf "${dir}"
     echo "SUCCESS - installed kubens"
+}
+
+function sops() {
+    # install sops software
+    # https://github.com/mozilla/sops/releases
+
+    project='mozilla/sops'
+    latest_version=$(get_latest_github_release "${project}")
+    filename="sops-${latest_version}.linux.amd64"
+    dir=$(mktemp -d)
+
+    download_github_release "${project}" "${version}" "${filename}" "${dir}"
+
+    echo "INFO - installing kubens software"
+    cp "${dir}/${filename}" "${INSTALL_DIR}/sops"
+    chmod +x "${INSTALL_DIR}/sops"
+
+    rm -rf "${dir}"
+
+}
+
+function velero() {
+    # installs velero binary from github
+    # https://github.com/vmware-tanzu/velero/releases
+
+    project='vmware-tanzu/velero'
+    latest_version=$(get_latest_github_release "${project}")
+    filename="velero-${latest_version}-linux-amd64.tar.gz"
+    dir=$(mktemp -d)
+
+    download_github_release "${project}" "${version}" "${filename}" "${dir}"
+
+    echo "INFO - installing velero software"
+    tar xfz "${dir}/${filename}" --directory "${dir}"
+    cp "${dir}/velero-${latest_version}-linux-amd64/velero" "${INSTALL_DIR}"
+
+    rm -rf "${dir}"
+    echo "SUCCESS - installed velero"
+
 }
 
 function oh_my_zsh() {
@@ -165,10 +254,13 @@ function zsh_plugins() {
 function main() {
     ensure_install_dir
     install_os_packages
+    helm
     kubectl
     k9s
     kubectx
     kubens
+    velero
+    sops
     oh_my_zsh
     zsh_plugins
 }
